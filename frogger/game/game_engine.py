@@ -27,7 +27,10 @@ HIT_PAUSE_MS = 800   # how long the collision stays visible before respawning
 # Game states
 PLAYING = "playing"
 HIT = "hit"            # frog was just hit; frozen in place briefly, then respawns
+WON = "won"
 GAME_OVER = "game_over"
+
+SCORE_PER_CROSSING = 100
 
 
 class GameEngine:
@@ -38,6 +41,7 @@ class GameEngine:
     def _reset_game_state(self):
         self.state = PLAYING
         self.lives = STARTING_LIVES
+        self.score = 0
         self.hit_started_ms = 0
 
     def _build_entities(self):
@@ -105,12 +109,14 @@ class GameEngine:
         if self.state != PLAYING:
             return
 
-        if check_collision(self.frog, self.vehicles):
-            self._lose_life()
+        # Goal is checked first so reaching it always wins.
+        if self.frog.row == GOAL_ROW:
+            self.score += SCORE_PER_CROSSING
+            self.state = WON
             return
 
-        if self.frog.row == GOAL_ROW:
-            self.frog.reset()
+        if check_collision(self.frog, self.vehicles):
+            self._lose_life()
 
     def _lose_life(self):
         """Consume one life. The frog stays where it was hit (drawn in the
@@ -128,5 +134,8 @@ class GameEngine:
         renderer.draw_scene(surface, self.frog, self.vehicles, hit=hit)
         renderer.draw_text(surface, font, "Arrow keys to move. R to restart.", (10, HEIGHT - 24))
         renderer.draw_text(surface, font, f"Lives: {self.lives}", (WIDTH - 110, HEIGHT - 24))
+        renderer.draw_text(surface, font, f"Score: {self.score}", (WIDTH - 110, HEIGHT - 48))
         if self.state == GAME_OVER:
             renderer.draw_banner(surface, font, "Game Over - press R to restart")
+        elif self.state == WON:
+            renderer.draw_banner(surface, font, "You Won! - press R to restart")
