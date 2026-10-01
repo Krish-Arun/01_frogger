@@ -22,11 +22,12 @@ COLOR_ROAD = (45, 45, 50)
 COLOR_START = (40, 90, 60)
 COLOR_LANE_LINE = (90, 90, 90)
 COLOR_FROG = (80, 220, 100)
+COLOR_FROG_HIT = (255, 255, 255)
 COLOR_VEHICLE = (220, 80, 70)
 COLOR_TEXT = (255, 255, 255)
 
 
-def draw_scene(surface, frog, vehicles):
+def draw_scene(surface, frog, vehicles, hit=False):
     surface.fill(COLOR_BG)
 
     for row in range(GRID_ROWS):
@@ -42,7 +43,7 @@ def draw_scene(surface, frog, vehicles):
     for v in vehicles:
         pygame.draw.rect(surface, COLOR_VEHICLE, v.get_rect(CELL_SIZE), border_radius=6)
 
-    pygame.draw.rect(surface, COLOR_FROG, frog.get_rect(CELL_SIZE), border_radius=8)
+    pygame.draw.rect(surface, COLOR_FROG_HIT if hit else COLOR_FROG, frog.get_rect(CELL_SIZE), border_radius=8)
 
 
 def draw_text(surface, font, text, pos, color=COLOR_TEXT):

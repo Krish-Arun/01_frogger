@@ -21,10 +21,24 @@ from game.renderer import (
 
 LANE_SPEEDS = [1.5, -2, 2, -2.5, 1.5, -2]   # one entry per road row, alternating direction
 
+STARTING_LIVES = 3
+HIT_PAUSE_MS = 800   # how long the collision stays visible before respawning
+
+# Game states
+PLAYING = "playing"
+HIT = "hit"            # frog was just hit; frozen in place briefly, then respawns
+GAME_OVER = "game_over"
+
 
 class GameEngine:
     def __init__(self):
         self._build_entities()
+        self._reset_game_state()
+
+    def _reset_game_state(self):
+        self.state = PLAYING
+        self.lives = STARTING_LIVES
+        self.hit_started_ms = 0
 
     def _build_entities(self):
         start_col = GRID_COLS // 2
@@ -63,6 +77,12 @@ class GameEngine:
                                               height=CELL_SIZE - 8, speed=speed))
 
     def handle_keydown(self, key):
+        if key == pygame.K_r:
+            self._build_entities()
+            self._reset_game_state()
+            return
+        if self.state != PLAYING:
+            return   # no hopping while hit or after the game has ended
         if key == pygame.K_UP:
             self.frog.move(0, -1)
         elif key == pygame.K_DOWN:
@@ -71,20 +91,42 @@ class GameEngine:
             self.frog.move(-1, 0)
         elif key == pygame.K_RIGHT:
             self.frog.move(1, 0)
-        elif key == pygame.K_r:
-            self._build_entities()
 
     def update(self):
+        # Vehicles keep moving in every state so the scene stays alive.
         for v in self.vehicles:
             v.update(road_width_px=WIDTH)
 
+        if self.state == HIT:
+            if pygame.time.get_ticks() - self.hit_started_ms >= HIT_PAUSE_MS:
+                self.frog.reset()
+                self.state = PLAYING
+            return
+        if self.state != PLAYING:
+            return
+
         if check_collision(self.frog, self.vehicles):
-            self.frog.reset()
+            self._lose_life()
+            return
 
         if self.frog.row == GOAL_ROW:
             self.frog.reset()
 
+    def _lose_life(self):
+        """Consume one life. The frog stays where it was hit (drawn in the
+        hit color) until HIT_PAUSE_MS passes, so the collision is visible."""
+        self.lives -= 1
+        if self.lives <= 0:
+            self.state = GAME_OVER
+        else:
+            self.state = HIT
+            self.hit_started_ms = pygame.time.get_ticks()
+
     def draw(self, surface, font):
         from game import renderer
-        renderer.draw_scene(surface, self.frog, self.vehicles)
+        hit = self.state in (HIT, GAME_OVER)
+        renderer.draw_scene(surface, self.frog, self.vehicles, hit=hit)
         renderer.draw_text(surface, font, "Arrow keys to move. R to restart.", (10, HEIGHT - 24))
+        renderer.draw_text(surface, font, f"Lives: {self.lives}", (WIDTH - 110, HEIGHT - 24))
+        if self.state == GAME_OVER:
+            renderer.draw_banner(surface, font, "Game Over - press R to restart")
