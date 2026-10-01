@@ -8,6 +8,7 @@ detection also has a known bug (see game/collisions.py) that Task 1
 asks you to fix.
 """
 
+import math
 import random
 
 import pygame
@@ -31,6 +32,7 @@ WON = "won"
 GAME_OVER = "game_over"
 
 SCORE_PER_CROSSING = 100
+ATTEMPT_TIME_MS = 30_000   # time allowed per attempt (each life)
 
 
 class GameEngine:
@@ -43,6 +45,12 @@ class GameEngine:
         self.lives = STARTING_LIVES
         self.score = 0
         self.hit_started_ms = 0
+        self._start_attempt()
+
+    def _start_attempt(self):
+        """Begin a fresh attempt with a full timer."""
+        self.time_left_ms = ATTEMPT_TIME_MS
+        self.last_tick_ms = pygame.time.get_ticks()
 
     def _build_entities(self):
         start_col = GRID_COLS // 2
@@ -105,9 +113,15 @@ class GameEngine:
             if pygame.time.get_ticks() - self.hit_started_ms >= HIT_PAUSE_MS:
                 self.frog.reset()
                 self.state = PLAYING
+                self._start_attempt()
             return
         if self.state != PLAYING:
             return
+
+        # Real elapsed time, so the countdown doesn't depend on FPS.
+        now = pygame.time.get_ticks()
+        self.time_left_ms -= now - self.last_tick_ms
+        self.last_tick_ms = now
 
         # Goal is checked first so reaching it always wins.
         if self.frog.row == GOAL_ROW:
@@ -117,9 +131,12 @@ class GameEngine:
 
         if check_collision(self.frog, self.vehicles):
             self._lose_life()
+        elif self.time_left_ms <= 0:
+            self.time_left_ms = 0
+            self._lose_life()   # timeout costs a life, same as a hit
 
     def _lose_life(self):
-        """Consume one life. The frog stays where it was hit (drawn in the
+        """Consume one life (hit or timeout). The frog stays where it was hit (drawn in the
         hit color) until HIT_PAUSE_MS passes, so the collision is visible."""
         self.lives -= 1
         if self.lives <= 0:
@@ -135,6 +152,8 @@ class GameEngine:
         renderer.draw_text(surface, font, "Arrow keys to move. R to restart.", (10, HEIGHT - 24))
         renderer.draw_text(surface, font, f"Lives: {self.lives}", (WIDTH - 110, HEIGHT - 24))
         renderer.draw_text(surface, font, f"Score: {self.score}", (WIDTH - 110, HEIGHT - 48))
+        seconds = math.ceil(self.time_left_ms / 1000)
+        renderer.draw_text(surface, font, f"Time: {seconds}", (WIDTH - 110, HEIGHT - 72))
         if self.state == GAME_OVER:
             renderer.draw_banner(surface, font, "Game Over - press R to restart")
         elif self.state == WON:
